@@ -1,35 +1,24 @@
-function RNAPunctaCounterGUI
-    % RNA Puncta Counter - GUI for threshold adjustment and puncta counting
+function RNAPunctaCounterGUI    
+    fig = uifigure('Name', 'Count RNA Puncta', 'WindowState', 'maximized');
     
-    % Create main figure (maximized)
-    fig = uifigure('Name', 'RNA Puncta Counter', 'WindowState', 'maximized');
-    
-    % Data structure to hold state
     data = struct();
     data.imageFiles = {};
     data.currentIndex = 1;
     data.originalImage = [];
     data.processedImage = [];
     data.resultsTable = table();
-    data.imageSettings = struct(); % Store settings per image
+    data.imageSettings = struct(); % for carrying over settings per image
     
-    % Create UI components
     createUIComponents();
-    
     function createUIComponents()
-        % Create grid layout
-        mainGrid = uigridlayout(fig, [1 2]);
-        mainGrid.ColumnWidth = {'4x', 300}; % Fixed width for controls
-        
-        % Left panel - Images only
+        mainGrid = uigridlayout(fig, [1 1]);
+       
         leftPanel = uipanel(mainGrid);
         leftPanel.Layout.Row = 1;
         leftPanel.Layout.Column = 1;
-        
         leftGrid = uigridlayout(leftPanel, [2 1]);
-        leftGrid.RowHeight = {'1x', 200}; % Fixed height for controls
+        leftGrid.RowHeight = {'1x', 280}; % image pane = remaining space, controls pane 280px
         
-        % Image display panels
         imageGrid = uigridlayout(leftGrid, [1 2]);
         imageGrid.Layout.Row = 1;
         imageGrid.ColumnWidth = {'1x', '1x'};
@@ -37,120 +26,88 @@ function RNAPunctaCounterGUI
         imageGrid.RowSpacing = 5;
         imageGrid.ColumnSpacing = 5;
         
-        % Original image panel
+        % OG image panel
         origPanel = uipanel(imageGrid, 'Title', 'Original Image');
         origPanel.FontSize = 14;
         origPanel.FontWeight = 'bold';
         
-        % Processed image panel
+        % edited image panel
         procPanel = uipanel(imageGrid, 'Title', 'Processed Image');
         procPanel.FontSize = 14;
         procPanel.FontWeight = 'bold';
-        
-        % Create axes that fill panels completely
+
+        % image axes (border) fill panels completely
         data.axesOriginal = axes(origPanel, 'Units', 'normalized', 'Position', [0 0 1 1]);
         axis(data.axesOriginal, 'off');
-        
         data.axesProcessed = axes(procPanel, 'Units', 'normalized', 'Position', [0 0 1 1]);
         axis(data.axesProcessed, 'off');
         
-        % Add zoom/pan to both axes
+        % zoom/pan
         zoom(data.axesOriginal, 'on');
         pan(data.axesOriginal, 'on');
         zoom(data.axesProcessed, 'on');
         pan(data.axesProcessed, 'on');
         
-        % Control panel - simple 2 column layout
+        % control panel
         controlPanel = uipanel(leftGrid, 'Title', 'Controls');
         controlPanel.Layout.Row = 2;
+        yPos = 230;
+        spacing = 45;
         
-        % Create controls using absolute positioning
-        yPos = 160;
-        spacing = 25;
-        
-        % Brightness
+        % brightness slider
         uilabel(controlPanel, 'Position', [10 yPos 100 22], 'Text', 'Brightness:', 'FontSize', 11, 'FontWeight', 'bold');
         data.brightnessSlider = uislider(controlPanel, 'Position', [120 yPos+5 200 3], 'Value', 0, ...
             'Limits', [-100 100], 'ValueChangedFcn', @(~,~)updateProcessing(false));
         yPos = yPos - spacing;
         
-        % Contrast
+        % contrast slider
         uilabel(controlPanel, 'Position', [10 yPos 100 22], 'Text', 'Contrast:', 'FontSize', 11, 'FontWeight', 'bold');
         data.contrastSlider = uislider(controlPanel, 'Position', [120 yPos+5 200 3], 'Value', 0, ...
             'Limits', [0 3], 'ValueChangedFcn', @(~,~)updateProcessing(false));
         yPos = yPos - spacing;
         
-        % Smoothing
+        % smoothing slider
         uilabel(controlPanel, 'Position', [10 yPos 100 22], 'Text', 'Smoothing:', 'FontSize', 11, 'FontWeight', 'bold');
         data.smoothSlider = uislider(controlPanel, 'Position', [120 yPos+5 200 3], 'Value', 0, ...
             'Limits', [0 5], 'ValueChangedFcn', @(~,~)updateProcessing(false));
         yPos = yPos - spacing;
         
-        % Min size
-        uilabel(controlPanel, 'Position', [10 yPos 100 22], 'Text', 'Min Size (px):', 'FontSize', 11, 'FontWeight', 'bold');
+        % minimum size: min area in pixels of each puncta region detected by threshold function (connected region)
+        uilabel(controlPanel, 'Position', [10 yPos 100 22], 'Text', 'Min size (px):', 'FontSize', 11, 'FontWeight', 'bold');
         data.minSizeField = uieditfield(controlPanel, 'numeric', 'Position', [120 yPos 80 22], 'Value', 0, ...
             'ValueChangedFcn', @(~,~)updateProcessing(false));
-        yPos = yPos - 35;
+        yPos = yPos - 40;
         
-        % Buttons
+        % buttons
         btnWidth = 110;
+        btnY = yPos;
         btnX = 10;
-        uibutton(controlPanel, 'Position', [btnX yPos btnWidth 30], 'Text', 'Load Folder', 'FontSize', 11, ...
+        uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'LOAD IMAGES', 'FontSize', 11, ...
             'ButtonPushedFcn', @(~,~)loadFolder());
         btnX = btnX + btnWidth + 5;
-        uibutton(controlPanel, 'Position', [btnX yPos btnWidth 30], 'Text', '← Previous', 'FontSize', 11, ...
+        uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'PREVIOUS', 'FontSize', 11, ...
             'ButtonPushedFcn', @(~,~)previousImage());
         btnX = btnX + btnWidth + 5;
-        uibutton(controlPanel, 'Position', [btnX yPos btnWidth 30], 'Text', 'Next →', 'FontSize', 11, ...
+        uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'NEXT', 'FontSize', 11, ...
             'ButtonPushedFcn', @(~,~)nextImage());
         btnX = btnX + btnWidth + 5;
-        uibutton(controlPanel, 'Position', [btnX yPos btnWidth 30], 'Text', 'Reset', 'FontSize', 11, ...
+        uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'RESET', 'FontSize', 11, ...
             'ButtonPushedFcn', @(~,~)resetSliders(), 'BackgroundColor', [1 0.8 0.4]);
         yPos = yPos - 40;
-        
-        % Count button
-        data.countButton = uibutton(controlPanel, 'Position', [10 yPos 450 35], 'Text', 'Count Puncta', 'FontSize', 13, ...
+        btnY2 = yPos;
+        data.countButton = uibutton(controlPanel, 'Position', [10 btnY2 220 35], 'Text', 'COUNT PUNCTA', 'FontSize', 13, ...
             'ButtonPushedFcn', @(~,~)countPuncta(), 'BackgroundColor', [0.2 0.8 0.2], 'FontWeight', 'bold');
-        yPos = yPos - 40;
-        
-        % Export button
-        data.exportButton = uibutton(controlPanel, 'Position', [10 yPos 450 30], 'Text', 'Export Results', 'FontSize', 12, ...
+        data.exportButton = uibutton(controlPanel, 'Position', [240 btnY2 220 35], 'Text', 'SAVE RESULTS', 'FontSize', 12, ...
             'ButtonPushedFcn', @(~,~)exportResults());
-        yPos = yPos - 30;
-        
-        % Labels at bottom
-        data.imageLabel = uilabel(controlPanel, 'Position', [10 yPos-5 450 20], 'Text', 'No image loaded', ...
-            'FontSize', 10, 'HorizontalAlignment', 'center');
-        yPos = yPos - 25;
-        
-        data.countLabel = uilabel(controlPanel, 'Position', [10 yPos-5 450 22], 'Text', '', ...
-            'FontSize', 13, 'FontWeight', 'bold', 'FontColor', [0 0.6 0], 'HorizontalAlignment', 'center');
-        yPos = yPos - 25;
-        
-        data.statusLabel = uilabel(controlPanel, 'Position', [10 yPos-5 450 20], 'Text', 'Load a folder to begin', ...
-            'FontWeight', 'bold', 'FontColor', [0.5 0.5 0.5], 'FontSize', 10, 'HorizontalAlignment', 'center');
-        
-        % Right panel - Results
-        rightPanel = uipanel(mainGrid, 'Title', 'Results Summary');
-        rightPanel.Layout.Row = 1;
-        rightPanel.Layout.Column = 2;
-        rightPanel.FontSize = 13;
-        rightPanel.FontWeight = 'bold';
-        
-        rightGrid = uigridlayout(rightPanel, [1 1]);
-        
-        % Results table
-        data.resultsUITable = uitable(rightGrid, 'FontSize', 10);
-        data.resultsUITable.Layout.Row = 1;
     end
 
     function loadFolder()
-        folderPath = uigetdir('', 'Select folder containing images');
+        folderPath = uigetdir('', 'select image folder');
         if folderPath == 0
             return;
         end
         
-        % Get all image files (case-insensitive)
+        % get image files
         data.imageFiles = {};
         allFiles = dir(folderPath);
         
@@ -170,13 +127,13 @@ function RNAPunctaCounterGUI
             return;
         end
         
-        % Initialize results table
+        % create empty results table for saving puncta counts
         data.resultsTable = table('Size', [length(data.imageFiles), 5], ...
             'VariableTypes', {'string', 'double', 'double', 'double', 'cell'}, ...
             'VariableNames', {'Filename', 'PunctaCount', 'MeanSize', 'TotalArea', 'IndividualSizes'});
         
-        % Initialize settings storage for each image
-        data.imageSettings = struct();
+        % to preserve the brightness/contrast/etc sliders for each image when you click next
+        data.imageSettings = struct(); 
         for i = 1:length(data.imageFiles)
             data.imageSettings(i).brightness = 0;
             data.imageSettings(i).contrast = 0;
@@ -186,11 +143,8 @@ function RNAPunctaCounterGUI
             data.imageSettings(i).ylim = [];
         end
         
-        % Load first image
         data.currentIndex = 1;
         loadCurrentImage();
-        
-        data.statusLabel.Text = sprintf('Loaded %d images', length(data.imageFiles));
     end
 
     function loadCurrentImage()
@@ -198,60 +152,43 @@ function RNAPunctaCounterGUI
             return;
         end
         
-        % Save current zoom/pan state before switching
+        % save current zoom/pan state before switching
         if ~isempty(data.originalImage)
             idx = data.currentIndex;
-            % Will be saved by the image we're leaving, handled in next/previous
         end
         
-        % Load image
+        % load image
         data.originalImage = imread(data.imageFiles{data.currentIndex});
-        
-        % Convert to grayscale if needed
-        if size(data.originalImage, 3) > 1
-            data.originalImage = rgb2gray(data.originalImage);
-        end
-        
-        % Convert to double for processing
         data.originalImage = im2double(data.originalImage);
-        
-        % Update image label
-        [~, fname, ext] = fileparts(data.imageFiles{data.currentIndex});
-        data.imageLabel.Text = sprintf('Image %d/%d: %s%s', ...
-            data.currentIndex, length(data.imageFiles), fname, ext);
-        
-        % Load saved settings for this image
+       
+        % load saved settings for current image
         idx = data.currentIndex;
         data.brightnessSlider.Value = data.imageSettings(idx).brightness;
         data.contrastSlider.Value = data.imageSettings(idx).contrast;
         data.smoothSlider.Value = data.imageSettings(idx).smoothing;
         data.minSizeField.Value = data.imageSettings(idx).minSize;
         
-        % Display original
+        % display original side by side
         cla(data.axesOriginal);
         imshow(data.originalImage, 'Parent', data.axesOriginal);
         axis(data.axesOriginal, 'image');
-        title(data.axesOriginal, 'Original Image', 'FontSize', 14, 'FontWeight', 'bold');
         
-        % Restore zoom if saved
         if ~isempty(data.imageSettings(idx).xlim)
             xlim(data.axesOriginal, data.imageSettings(idx).xlim);
             ylim(data.axesOriginal, data.imageSettings(idx).ylim);
         end
         
-        % Update processing with saved settings
         updateProcessing(true);
-        
-        % Update count label if already processed
+ 
         if ~isnan(data.resultsTable.PunctaCount(idx))
-            data.countLabel.Text = sprintf('Puncta: %d', data.resultsTable.PunctaCount(idx));
+            data.statusLabel.Text = sprintf('Puncta: %d', data.resultsTable.PunctaCount(idx));
+            data.statusLabel.FontColor = [0 0.6 0];
         else
-            data.countLabel.Text = '';
+            data.statusLabel.Text = '';
         end
     end
     
     function saveCurrentSettings()
-        % Save current settings and zoom state
         idx = data.currentIndex;
         data.imageSettings(idx).brightness = data.brightnessSlider.Value;
         data.imageSettings(idx).contrast = data.contrastSlider.Value;
@@ -266,12 +203,11 @@ function RNAPunctaCounterGUI
             return;
         end
         
-        % Save zoom state before update
+        % save zoom state 
         if ~restoreZoom
             saveCurrentSettings();
         end
         
-        % Get current zoom limits
         if ~restoreZoom && isvalid(data.axesProcessed)
             currentXLim = xlim(data.axesProcessed);
             currentYLim = ylim(data.axesProcessed);
@@ -288,48 +224,44 @@ function RNAPunctaCounterGUI
         
         img = data.originalImage;
         
-        % Only apply brightness if slider is not at 0
+        % apply brightness/contrast if slider is NOT at 0
         if data.brightnessSlider.Value ~= 0
             brightness = data.brightnessSlider.Value / 100;
             img = img + brightness;
             img = max(0, min(1, img));
         end
         
-        % Only apply contrast if slider is not at 0
         if data.contrastSlider.Value ~= 0
             contrast = 1 + data.contrastSlider.Value;
             img = imadjust(img, [], [], contrast);
         end
         
-        % Only apply smoothing if slider is not at 0
+        % apply smoothing if slider is not at 0
         if data.smoothSlider.Value > 0
             sigma = data.smoothSlider.Value;
             img = imgaussfilt(img, sigma);
         end
         
-        % Check if any processing has been applied
+        % has any editing has been applied?
         anyProcessing = (data.brightnessSlider.Value ~= 0) || ...
                        (data.contrastSlider.Value ~= 0) || ...
                        (data.smoothSlider.Value > 0);
         
-        % Display processed image
+        % display edited image
         cla(data.axesProcessed);
         if ~anyProcessing
             imshow(data.originalImage, 'Parent', data.axesProcessed);
-            title(data.axesProcessed, 'Processed Image (No adjustments)', 'FontSize', 14, 'FontWeight', 'bold');
         else
             imshow(img, 'Parent', data.axesProcessed);
-            title(data.axesProcessed, 'Adjusted Image (Ready to threshold)', 'FontSize', 14, 'FontWeight', 'bold');
         end
         axis(data.axesProcessed, 'image');
         
-        % Restore zoom
         if ~isempty(currentXLim)
             xlim(data.axesProcessed, currentXLim);
             ylim(data.axesProcessed, currentYLim);
         end
         
-        % Store the adjusted image for thresholding
+        % store edited image for thresholding (count puncta)
         data.adjustedImage = img;
         data.processedImage = [];
     end
@@ -340,18 +272,17 @@ function RNAPunctaCounterGUI
             return;
         end
         
-        % Save current zoom state
         currentXLim = xlim(data.axesProcessed);
         currentYLim = ylim(data.axesProcessed);
         
-        % Use adjusted image if available, otherwise use original
+        % use adjusted image
         if isfield(data, 'adjustedImage') && ~isempty(data.adjustedImage)
             img = data.adjustedImage;
         else
-            img = data.originalImage;
+            img = data.originalImage; % was unedited use OG
         end
         
-        % Apply threshold
+        % apply threshold
         try
             level = graythresh(img);
             bw = imbinarize(img, level);
@@ -359,20 +290,20 @@ function RNAPunctaCounterGUI
             bw = imbinarize(img);
         end
         
-        % Clean up small objects only if min size > 0
+        % clean up small objects only if min size > 0
         if data.minSizeField.Value > 0
             minSize = data.minSizeField.Value;
             bw = bwareaopen(bw, round(minSize));
         end
         
-        % Store the binary mask
+        % store the binary mask
         data.processedImage = bw;
         
-        % Label connected components
+        % label connected components
         labeled = bwlabel(bw);
         stats = regionprops(labeled, 'Area', 'Centroid');
         
-        % Count puncta
+        % count puncta
         numPuncta = length(stats);
         
         if numPuncta == 0
@@ -385,7 +316,7 @@ function RNAPunctaCounterGUI
             totalArea = sum(areas);
         end
         
-        % Store results
+        % store results
         [~, fname, ext] = fileparts(data.imageFiles{data.currentIndex});
         data.resultsTable.Filename(data.currentIndex) = string([fname ext]);
         data.resultsTable.PunctaCount(data.currentIndex) = numPuncta;
@@ -393,13 +324,10 @@ function RNAPunctaCounterGUI
         data.resultsTable.TotalArea(data.currentIndex) = totalArea;
         data.resultsTable.IndividualSizes{data.currentIndex} = areas;
         
-        % Update display table
-        data.resultsUITable.Data = data.resultsTable(:, 1:4);
-        
-        % Create colored visualization
+        % colored visual
         rgb = label2rgb(labeled, 'jet', 'k', 'shuffle');
         
-        % Display with numbers
+        % display counting mask with puncta labels (numbers)
         cla(data.axesProcessed);
         imshow(rgb, 'Parent', data.axesProcessed);
         axis(data.axesProcessed, 'image');
@@ -413,13 +341,11 @@ function RNAPunctaCounterGUI
         title(data.axesProcessed, sprintf('Labeled Puncta (n=%d)', numPuncta), ...
             'FontSize', 14, 'FontWeight', 'bold');
         
-        % Restore zoom
         xlim(data.axesProcessed, currentXLim);
         ylim(data.axesProcessed, currentYLim);
         
-        % Update labels
-        data.countLabel.Text = sprintf('Puncta: %d', numPuncta);
-        data.statusLabel.Text = sprintf('Counted %d puncta (Mean: %.1f px)', numPuncta, meanArea);
+        % update labels
+        data.statusLabel.Text = sprintf('counted %d puncta (Mean: %.1f px)', numPuncta, meanArea);
         data.statusLabel.FontColor = [0 0.6 0];
     end
 
@@ -452,21 +378,16 @@ function RNAPunctaCounterGUI
             return;
         end
         
-        % Export summary (without cell array column)
         summaryTable = data.resultsTable(:, 1:4);
         writetable(summaryTable, fullfile(path, file));
         
-        % Also export detailed sizes
         [~, fname, ~] = fileparts(file);
         detailFile = fullfile(path, [fname '_detailed.mat']);
         resultsTable = data.resultsTable;
         save(detailFile, 'resultsTable');
         
-        uialert(fig, sprintf('Results exported to:\n%s\n%s', ...
+        uialert(fig, sprintf('results exported to:\n%s\n%s', ...
             fullfile(path, file), detailFile), 'Success');
-        
-        data.statusLabel.Text = 'Results exported successfully';
-        data.statusLabel.FontColor = [0 0.6 0];
     end
     
     function resetSliders()
@@ -474,16 +395,14 @@ function RNAPunctaCounterGUI
             return;
         end
         
-        % Reset all sliders to default values
+        % reset sliders to default values
         data.brightnessSlider.Value = 0;
         data.contrastSlider.Value = 0;
         data.smoothSlider.Value = 0;
         data.minSizeField.Value = 0;
         
-        % Update processing to show original image
         updateProcessing(false);
         
-        data.statusLabel.Text = 'Sliders reset';
         data.statusLabel.FontColor = [0.5 0.5 0.5];
     end
 end
