@@ -129,7 +129,6 @@ function RNAPunctaCounterGUI
             data.imageSettings(i).brightness = 0;
             data.imageSettings(i).contrast = 0;
             data.imageSettings(i).smoothing = 0;
-            data.imageSettings(i).minSize = 0;
             data.imageSettings(i).xlim = [];
             data.imageSettings(i).ylim = [];
         end
@@ -154,7 +153,6 @@ function RNAPunctaCounterGUI
         data.brightnessSlider.Value = data.imageSettings(idx).brightness;
         data.contrastSlider.Value = data.imageSettings(idx).contrast;
         data.smoothSlider.Value = data.imageSettings(idx).smoothing;
-        data.minSizeField.Value = data.imageSettings(idx).minSize;
         
         % display original side by side
         cla(data.axesOriginal);
@@ -181,7 +179,6 @@ function RNAPunctaCounterGUI
         data.imageSettings(idx).brightness = data.brightnessSlider.Value;
         data.imageSettings(idx).contrast = data.contrastSlider.Value;
         data.imageSettings(idx).smoothing = data.smoothSlider.Value;
-        data.imageSettings(idx).minSize = data.minSizeField.Value;
         data.imageSettings(idx).xlim = xlim(data.axesProcessed);
         data.imageSettings(idx).ylim = ylim(data.axesProcessed);
     end
@@ -281,12 +278,11 @@ function RNAPunctaCounterGUI
         level = graythresh(img);
         bw = imbinarize(img, level); % imbinarize(): turns all pixels above that threshold into 1 (white), below into 0 (black)
 
-        
-        % clean up small objects only if min size > 0 (specified by user slider)
-        if data.minSizeField.Value > 0 
-            minSize = data.minSizeField.Value;
-            bw = bwareaopen(bw, round(minSize));
-        end
+        % show thresholded image in popup window!
+        threshFig = uifigure('Name', 'Thresholded Image', 'Position', [100 100 800 600]);
+        threshAx = axes(threshFig, 'Units', 'normalized', 'Position', [0.05 0.05 0.9 0.9]);
+        imshow(bw, 'Parent', threshAx);
+        title(threshAx, 'Binary Thresholded Image', 'FontSize', 14, 'FontWeight', 'bold');
         
         % store the binary mask
         data.processedImage = bw;
@@ -368,7 +364,6 @@ function RNAPunctaCounterGUI
         data.brightnessSlider.Value = 0;
         data.contrastSlider.Value = 0;
         data.smoothSlider.Value = 0;
-        data.minSizeField.Value = 0;
         
         updateProcessing(false);
         
