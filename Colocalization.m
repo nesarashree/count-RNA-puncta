@@ -492,22 +492,33 @@ function Colocalization
             numCells = max(cellLabeled(:));
             
             % Find which puncta overlap with cells
-            colocMask = false(size(bw));
+            colocIndices = false(numPuncta, 1);  % Track which puncta are colocalized
+            
             for i = 1:numPuncta
                 % Check if centroid is inside a cell
-                centroid = round(stats(i).Centroid);
-                if centroid(2) > 0 && centroid(2) <= size(cellImg,1) && ...
-                   centroid(1) > 0 && centroid(1) <= size(cellImg,2)
-                    if cellImg(centroid(2), centroid(1))
-                        colocMask(stats(i).PixelIdxList) = true;
+                centroid = stats(i).Centroid;  % [x, y] format
+                x = round(centroid(1));
+                y = round(centroid(2));
+                
+                % Bounds checking
+                if y >= 1 && y <= size(cellImg, 1) && x >= 1 && x <= size(cellImg, 2)
+                    if cellImg(y, x)  % Note: image indexing is (row, col) = (y, x)
+                        colocIndices(i) = true;
                     end
                 end
             end
             
             % Count colocalized vs non-colocalized
-            colocLabeled = bwlabel(colocMask);
-            numColoc = max(colocLabeled(:));
+            numColoc = sum(colocIndices);
             numNonColoc = numPuncta - numColoc;
+            
+            % Create colocalization mask for visualization
+            colocMask = false(size(bw));
+            for i = 1:numPuncta
+                if colocIndices(i)
+                    colocMask(stats(i).PixelIdxList) = true;
+                end
+            end
             
             % Store colocalization results
             data.resultsTable.NumCells(idx) = numCells;
@@ -534,8 +545,9 @@ function Colocalization
         rgb = zeros(h, w, 3);
         
         % Separate colocalized and non-colocalized puncta
-        colocPuncta = labeled .* uint16(colocMask);
-        nonColocPuncta = labeled .* uint16(~colocMask & labeled > 0);
+        % Fix: ensure same data type for multiplication
+        colocPuncta = double(labeled) .* double(colocMask);
+        nonColocPuncta = double(labeled) .* double(~colocMask & labeled > 0);
         
         % Colocalized puncta = Yellow (R+G)
         rgb(:,:,1) = rgb(:,:,1) + double(colocPuncta > 0);
