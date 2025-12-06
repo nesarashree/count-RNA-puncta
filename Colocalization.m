@@ -11,6 +11,7 @@ function Colocalization
     data.resultsTable = table();
     data.imageSettings = struct();
     data.globalMinSize = 0;
+    data.globalMaxSize = inf;
     data.processedImages = struct();
     data.hasOverlay = false; % Track if cell masks are loaded
     
@@ -64,6 +65,12 @@ function Colocalization
         uilabel(controlPanel, 'Position', [10 yPos 150 22], 'Text', 'Min size (px) [Global]:', 'FontSize', 11, 'FontWeight', 'bold');
         data.minSizeField = uieditfield(controlPanel, 'numeric', 'Position', [170 yPos 80 22], 'Value', 0, ...
             'ValueChangedFcn', @(src,~)updateGlobalMinSize(src));
+        yPos = yPos - 35;
+        
+        % Max size filter
+        uilabel(controlPanel, 'Position', [10 yPos 150 22], 'Text', 'Max size (px) [Global]:', 'FontSize', 11, 'FontWeight', 'bold');
+        data.maxSizeField = uieditfield(controlPanel, 'numeric', 'Position', [170 yPos 80 22], 'Value', inf, ...
+            'ValueChangedFcn', @(src,~)updateGlobalMaxSize(src));
         yPos = yPos - 35;
         
         % File info labels
@@ -132,6 +139,10 @@ function Colocalization
 
     function updateGlobalMinSize(src)
         data.globalMinSize = src.Value;
+    end
+
+    function updateGlobalMaxSize(src)
+        data.globalMaxSize = src.Value;
     end
 
     function loadPunctaFolder()
@@ -464,6 +475,17 @@ function Colocalization
             bw = bwareaopen(bw, round(data.globalMinSize));
         end
         
+        % Remove large puncta
+        if ~isinf(data.globalMaxSize)
+            labeled_temp = bwlabel(bw);
+            stats_temp = regionprops(labeled_temp, 'Area');
+            for i = 1:length(stats_temp)
+                if stats_temp(i).Area > data.globalMaxSize
+                    bw(labeled_temp == i) = false;
+                end
+            end
+        end
+        
         % Label puncta
         labeled = bwlabel(bw);
         stats = regionprops(labeled, 'Area', 'Centroid', 'PixelIdxList');
@@ -582,10 +604,10 @@ function Colocalization
         end
         
         % Export table without IndividualSizes
-        if data.hasOverlay
-            exportTable = data.resultsTable(:, 1:8);
+         if data.hasOverlay
+            exportTable = data.resultsTable(:, {'Filename', 'TotalPuncta', 'MeanSize', 'NumCells', 'ColocPuncta', 'NonColocPuncta'});
         else
-            exportTable = data.resultsTable(:, 1:4);
+            exportTable = data.resultsTable(:, {'Filename', 'TotalPuncta', 'MeanSize'});
         end
         
         fullpath = fullfile(pathname, filename);
@@ -621,7 +643,9 @@ function Colocalization
         end
         
         data.globalMinSize = 0;
+        data.globalMaxSize = inf;
         data.minSizeField.Value = 0;
+        data.maxSizeField.Value = inf;
         loadCurrentImage();
         
         data.statusLabel.Text = 'View reset';
