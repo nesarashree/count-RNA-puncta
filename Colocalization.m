@@ -13,7 +13,10 @@ function Colocalization
     data.globalMinSize = 0;
     data.globalMaxSize = inf;
     data.processedImages = struct();
-    data.hasOverlay = false; % Track if cell masks are loaded
+    data.hasOverlay = false;
+    
+    % set pixel size (microns per pixel)
+    data.pixelSize = 1.0; 
     
     createUIComponents();
     
@@ -89,11 +92,11 @@ function Colocalization
         btnX = startX;
         
         uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'LOAD PUNCTA', 'FontSize', 11, ...
-            'ButtonPushedFcn', @(~,~)loadPunctaFolder(), 'BackgroundColor', [1 0.7 0.9]);
+            'ButtonPushedFcn', @(~,~)loadPunctaFolder(), 'BackgroundColor', [1 0.7 0.9], 'FontWeight', 'bold');
         btnX = btnX + btnWidth + btnSpacing;
         
-        uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'LOAD CELLS (Optional)', 'FontSize', 11, ...
-            'ButtonPushedFcn', @(~,~)loadCellFolder(), 'BackgroundColor', [0.7 1 0.7]);
+        uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'LOAD CELLS', 'FontSize', 11, ...
+            'ButtonPushedFcn', @(~,~)loadCellFolder(), 'BackgroundColor', [0.7 1 0.7], 'FontWeight', 'bold');
         btnX = btnX + btnWidth + btnSpacing;
         
         uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'PREVIOUS', 'FontSize', 11, ...
@@ -105,7 +108,7 @@ function Colocalization
         btnX = btnX + btnWidth + btnSpacing;
         
         uibutton(controlPanel, 'Position', [btnX btnY btnWidth 30], 'Text', 'RESET', 'FontSize', 11, ...
-            'ButtonPushedFcn', @(~,~)resetView(), 'BackgroundColor', [1 0.8 0.4]);
+            'ButtonPushedFcn', @(~,~)resetView(), 'BackgroundColor', [1 0.8 0.4], 'FontWeight', 'bold');
         
         yPos = yPos - 45;
         btnY2 = yPos;
@@ -161,14 +164,15 @@ function Colocalization
         % Initialize results table
         numFiles = length(data.punctaFiles);
         if data.hasOverlay
-            data.resultsTable = table('Size', [numFiles, 9], ...
-                'VariableTypes', {'string', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'cell'}, ...
+            data.resultsTable = table('Size', [numFiles, 13], ...
+                'VariableTypes', {'string', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'cell'}, ...
                 'VariableNames', {'Filename', 'TotalPuncta', 'MeanSize', 'TotalArea', ...
-                                  'NumCells', 'ColocPuncta', 'NonColocPuncta', 'PunctaPerCell', 'IndividualSizes'});
+                                  'NumCells', 'ColocPuncta', 'NonColocPuncta', 'PunctaPerCell', ...
+                                  'Density', 'CellsWithPuncta', 'PercentCellsWithPuncta', 'PercentPunctaColocalized', 'IndividualSizes'});
         else
-            data.resultsTable = table('Size', [numFiles, 5], ...
-                'VariableTypes', {'string', 'double', 'double', 'double', 'cell'}, ...
-                'VariableNames', {'Filename', 'TotalPuncta', 'MeanSize', 'TotalArea', 'IndividualSizes'});
+            data.resultsTable = table('Size', [numFiles, 6], ...
+                'VariableTypes', {'string', 'double', 'double', 'double', 'double', 'cell'}, ...
+                'VariableNames', {'Filename', 'TotalPuncta', 'MeanSize', 'TotalArea', 'Density', 'IndividualSizes'});
         end
         
         data.imageSettings = struct();
@@ -215,10 +219,11 @@ function Colocalization
         % Update results table to include colocalization columns
         if ~isempty(data.resultsTable) && height(data.resultsTable) > 0
             numFiles = height(data.resultsTable);
-            newTable = table('Size', [numFiles, 9], ...
-                'VariableTypes', {'string', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'cell'}, ...
+            newTable = table('Size', [numFiles, 13], ...
+                'VariableTypes', {'string', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'double', 'cell'}, ...
                 'VariableNames', {'Filename', 'TotalPuncta', 'MeanSize', 'TotalArea', ...
-                                  'NumCells', 'ColocPuncta', 'NonColocPuncta', 'PunctaPerCell', 'IndividualSizes'});
+                                  'NumCells', 'ColocPuncta', 'NonColocPuncta', 'PunctaPerCell', ...
+                                  'Density', 'CellsWithPuncta', 'PercentCellsWithPuncta', 'PercentPunctaColocalized', 'IndividualSizes'});
             
             % Copy existing data
             if ismember('Filename', data.resultsTable.Properties.VariableNames)
@@ -226,6 +231,7 @@ function Colocalization
                 newTable.TotalPuncta = data.resultsTable.TotalPuncta;
                 newTable.MeanSize = data.resultsTable.MeanSize;
                 newTable.TotalArea = data.resultsTable.TotalArea;
+                newTable.Density = data.resultsTable.Density;
                 newTable.IndividualSizes = data.resultsTable.IndividualSizes;
             end
             data.resultsTable = newTable;
@@ -499,12 +505,20 @@ function Colocalization
             meanArea = mean(areas);
         end
         
+        % Calculate image area in microns^2
+        [h, w] = size(punctaImg);
+        imageAreaMicrons = h * w * data.pixelSize^2;
+        
+        % Calculate density (puncta per micron^2)
+        density = numPuncta / imageAreaMicrons;
+        
         % Store basic results
         [~, fname, ext] = fileparts(data.punctaFiles{idx});
         data.resultsTable.Filename(idx) = string([fname ext]);
         data.resultsTable.TotalPuncta(idx) = numPuncta;
         data.resultsTable.MeanSize(idx) = meanArea;
         data.resultsTable.TotalArea(idx) = sum(areas);
+        data.resultsTable.Density(idx) = density;
         data.resultsTable.IndividualSizes{idx} = areas;
         
         % Colocalization analysis
@@ -513,19 +527,22 @@ function Colocalization
             cellLabeled = bwlabel(cellImg);
             numCells = max(cellLabeled(:));
             
-            % Find which puncta overlap with cells
-            colocIndices = false(numPuncta, 1);  % Track which puncta are colocalized
+            % Find which puncta overlap with cells and which cells have puncta
+            colocIndices = false(numPuncta, 1);
+            cellsWithPuncta = false(numCells, 1);
             
             for i = 1:numPuncta
                 % Check if centroid is inside a cell
-                centroid = stats(i).Centroid;  % [x, y] format
+                centroid = stats(i).Centroid;
                 x = round(centroid(1));
                 y = round(centroid(2));
                 
                 % Bounds checking
                 if y >= 1 && y <= size(cellImg, 1) && x >= 1 && x <= size(cellImg, 2)
-                    if cellImg(y, x)  % Note: image indexing is (row, col) = (y, x)
+                    cellLabel = cellLabeled(y, x);
+                    if cellLabel > 0
                         colocIndices(i) = true;
+                        cellsWithPuncta(cellLabel) = true;
                     end
                 end
             end
@@ -533,6 +550,12 @@ function Colocalization
             % Count colocalized vs non-colocalized
             numColoc = sum(colocIndices);
             numNonColoc = numPuncta - numColoc;
+            numCellsWithPuncta = sum(cellsWithPuncta);
+            
+            % Calculate percentages
+            percentCellsWithPuncta = 100 * numCellsWithPuncta / max(1, numCells);
+            percentPunctaColocalized = 100 * numColoc / max(1, numPuncta);
+            meanPunctaPerCell = numColoc / max(1, numCells);
             
             % Create colocalization mask for visualization
             colocMask = false(size(bw));
@@ -546,7 +569,10 @@ function Colocalization
             data.resultsTable.NumCells(idx) = numCells;
             data.resultsTable.ColocPuncta(idx) = numColoc;
             data.resultsTable.NonColocPuncta(idx) = numNonColoc;
-            data.resultsTable.PunctaPerCell(idx) = numColoc / max(1, numCells);
+            data.resultsTable.PunctaPerCell(idx) = meanPunctaPerCell;
+            data.resultsTable.CellsWithPuncta(idx) = numCellsWithPuncta;
+            data.resultsTable.PercentCellsWithPuncta(idx) = percentCellsWithPuncta;
+            data.resultsTable.PercentPunctaColocalized(idx) = percentPunctaColocalized;
             
             % Create visualization with colocalized puncta highlighted
             rgb = createColocVisualization(labeled, colocMask, cellImg);
@@ -567,7 +593,6 @@ function Colocalization
         rgb = zeros(h, w, 3);
         
         % Separate colocalized and non-colocalized puncta
-        % Fix: ensure same data type for multiplication
         colocPuncta = double(labeled) .* double(colocMask);
         nonColocPuncta = double(labeled) .* double(~colocMask & labeled > 0);
         
@@ -603,11 +628,13 @@ function Colocalization
             return;
         end
         
-        % Export table without IndividualSizes
-         if data.hasOverlay
-            exportTable = data.resultsTable(:, {'Filename', 'TotalPuncta', 'MeanSize', 'NumCells', 'ColocPuncta', 'NonColocPuncta'});
+        % Export table with all relevant columns
+        if data.hasOverlay
+            exportTable = data.resultsTable(:, {'Filename', 'TotalPuncta', 'MeanSize', 'TotalArea', ...
+                'Density', 'NumCells', 'ColocPuncta', 'NonColocPuncta', 'PunctaPerCell', ...
+                'CellsWithPuncta', 'PercentCellsWithPuncta', 'PercentPunctaColocalized'});
         else
-            exportTable = data.resultsTable(:, {'Filename', 'TotalPuncta', 'MeanSize'});
+            exportTable = data.resultsTable(:, {'Filename', 'TotalPuncta', 'MeanSize', 'TotalArea', 'Density'});
         end
         
         fullpath = fullfile(pathname, filename);
