@@ -32,7 +32,10 @@ Apply *watershed* to segment clumps of detected puncta (in FIJI: Process -> Bina
   <img src="images-for-README/GUI.png" width="1000">
 </p>
 
-* Designed for **batch analysis**! Process large datasets of images reproducibly and efficiently using the "batch count" / "batch coloc" buttons. 
+* Designed for **batch analysis**! Process large datasets of images reproducibly and efficiently using the "batch count" / "batch coloc" buttons. Numeric info is exported to CSV for each image in the dataset.
+<p align="center">
+  <img src="images-for-README/csv.png" width="700">
+</p>
 
 ## EXAMPLE WORKFLOW
 <p align="center">
