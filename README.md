@@ -9,7 +9,9 @@ The FIJI Trainable Weka Segmentation (TWS) plugin integrates the image-processin
 <p align="center">
   <img src="images-for-README/classifieroutput.png" width="1000">
 </p>
-The classifier model in this repository was trained on ~15 INHBA mRNA puncta images with 3 training (or classification) labels: puncta, background (black), and noise.
+
+The classifier model in this repository ( [Google Drive download link](https://drive.google.com/file/d/1DyxPmiG2cWH34HeAA1bCvjoVOSbJI5gX/view?usp=sharing) ) was trained on ~15 INHBA mRNA puncta images with 3 training (or classification) labels: puncta, background (black), and noise.
+
 <p align="center">
   <img src="images-for-README/train.png" width="600">
 </p>
